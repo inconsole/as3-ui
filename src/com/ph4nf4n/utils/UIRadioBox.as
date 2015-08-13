@@ -1,40 +1,41 @@
 package com.ph4nf4n.utils
 {
-	import com.ph4nf4n.events.CheckBoxEvent;
+	import com.ph4nf4n.events.RadioBoxEvent;
 	
 	import flash.display.Shape;
 	import flash.display.Sprite;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.filters.GlowFilter;
-	
 	import flash.text.TextField;
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
-	
-	public class UICheckBox extends Sprite
+	/*
+	TODO:
+	1:点击的范围好像过大，需要调整
+	2:按钮配色
+	*/
+	public class UIRadioBox extends Sprite
 	{
-		private var _label:TextField;  
-		private var _tick:Shape;  
+		private var _tf:TextField;  
+		private var _circle:Shape;  
 		private var _checked:Boolean=false;  
-		private var _isDowned:Boolean=false;  
-		private var _outlineGlowFilter:GlowFilter;  
-		private var _innerlineGlowFilter:GlowFilter;  
+		private var _isDowned:Boolean=false;
 		
 		private var _width:Number;
 		private var _height:Number;
 		
 		public function get text():String  
 		{  
-			return _label.text;  
+			return _tf.text;  
 		}  
 		
 		public function set text(value:String):void  
 		{  
-			if(_label.text!=value)  
+			if(_tf.text!=value)  
 			{  
-				_label.text=value;  
-				_label.y=-5/2;  
+				_tf.text=value;  
+				_tf.y=-5/2;  
 			}  
 		}  
 		
@@ -48,48 +49,47 @@ package com.ph4nf4n.utils
 			if(_checked!=value)  
 			{  
 				_checked=value;  
-				refreshBackground();  
-				dispatchEvent(new CheckBoxEvent(CheckBoxEvent.ON_CHECKED_CHANGED));  
+				redraw();  
+				//dispatchEvent(new RadioButtonEvent(RadioButtonEvent.ON_CHECKED_CHANGED));  
 			}  
 		}  
 		
-		public function UICheckBox($x:Number=0, $y:Number=0, $w:Number=80, $h:Number=20)  
+		public function UIRadioBox($x:Number=0, $y:Number=0, $w:Number=80, $h:Number=20)  
 		{  
-			//super();  
+			//super(); 
 			this.x = $x;
 			this.y = $y;
 			this._width = $w;
 			this._height = $h;
 			
-			initialize();
+			initialize();  
 		}  
 		
-		//protected override function initialize():void  
-		public function initialize():void  
+		private function initialize():void  
 		{  
-			this.mouseChildren=false;  
 			
-			_outlineGlowFilter=new GlowFilter(0x00ff00,1,3,3,2);  
-			_innerlineGlowFilter=new GlowFilter(0x00ff00,1,3,3,2,1,true);  
+			//x=10;
+			//y=10;
 			
-			_label=new TextField();  
-			_label.x=20;
-			_label.y=20;
+			
+			
+			_tf=new TextField();  
+			_tf.x=20;
+			_tf.y=20;
 			
 			var _tft:TextFormat = new TextFormat();
-			//_tft.align = TextFormatAlign.CENTER;
+			_tft.align = TextFormatAlign.LEFT;
 			_tft.size = 12;
 			//_tft.color = 0xFFFF00;
 			_tft.font = "Microsoft Yahei,STXihei,SimSun,Arial,Verdana";
-			_label.defaultTextFormat = _tft;
-			_label.selectable = false;
+			_tf.defaultTextFormat = _tft;
+			_tf.selectable = false;
+			addChild(_tf);  
 			
-			addChild(_label);  
-			
-			_tick=new Shape();
-			_tick.x=5;
-			_tick.y=3;
-			addChild(_tick);  
+			_circle=new Shape(); 
+			_circle.x=5;
+			_circle.y=3;
+			addChild(_circle);  
 			
 			if(stage)  
 			{  
@@ -100,9 +100,7 @@ package com.ph4nf4n.utils
 				addEventListener(Event.ADDED_TO_STAGE,onAddedToStageHandler);  
 			}  
 			
-			refreshBackground();  
-			
-			_tick.filters=[_outlineGlowFilter];  
+			redraw();  
 		}  
 		
 		private function onAddedToStageHandler(e:Event=null):void  
@@ -128,9 +126,10 @@ package com.ph4nf4n.utils
 			if(_isDowned)  
 			{  
 				_isDowned=false;  
-				//_label.x-=1;  
-				//_label.y-=1;  
-			}  
+				//this.x-=1;  
+				//this.y-=1;  
+			} 
+			dispatchEvent(new RadioBoxEvent(RadioBoxEvent.ON_RADIO_CHANGED));
 		}  
 		
 		private function onMouseDownHandler(e:MouseEvent):void  
@@ -138,8 +137,8 @@ package com.ph4nf4n.utils
 			if(!_isDowned)  
 			{  
 				_isDowned=true;  
-				//_label.x+=1;  
-				//_label.y+=1;  
+				//this.x+=1;  
+				//this.y+=1;  
 			}  
 		}  
 		
@@ -150,7 +149,7 @@ package com.ph4nf4n.utils
 			
 			onMouseUpHandler();  
 			
-			_tick.filters=[_outlineGlowFilter];  
+			_circle.filters=null;  
 		}  
 		
 		private function onMouseOverHandler(e:MouseEvent):void  
@@ -158,7 +157,7 @@ package com.ph4nf4n.utils
 			removeEventListener(MouseEvent.MOUSE_OVER,onMouseOverHandler);  
 			addEventListener(MouseEvent.MOUSE_OUT,onMouseOutHandler);  
 			
-			_tick.filters=[_outlineGlowFilter,_innerlineGlowFilter];  
+			_circle.filters=[new GlowFilter(0x00ff00,1,3,3,3)];  
 		}  
 		
 		private function onRemovedFromStageHandler(e:Event):void  
@@ -171,30 +170,28 @@ package com.ph4nf4n.utils
 			removeEventListener(MouseEvent.CLICK,onClickHandler);  
 		}  
 		
-		//protected override function refreshBackground():void
-		public function refreshBackground():void  
+		private function redraw():void  
 		{  
-			_tick.graphics.clear();  
+			_circle.graphics.clear();  
 			
-			_tick.graphics.beginFill(0x00ff00,0.01);  
-			_tick.graphics.drawCircle(5,5,4);  
-			_tick.graphics.endFill();  
+			_circle.graphics.lineStyle(1);  
+			_circle.graphics.moveTo(5+5,0+5);  
 			
-			_tick.graphics.lineStyle(1);  
-			_tick.graphics.moveTo(0,0);  
-			_tick.graphics.lineTo(10,0);  
-			_tick.graphics.lineTo(10,10);  
-			_tick.graphics.lineTo(0,10);  
-			_tick.graphics.lineTo(0,0);  
+			var perAngle:Number=(Math.PI*2)/180;  
+			for (var i:int = 0; i < 180; i++)   
+			{  
+				_circle.graphics.lineTo(Math.cos(i*perAngle)*5+5,Math.sin(i*perAngle)*5+5);   
+			}  
+			
+			//          _circle.graphics.lineTo(5,0);  
 			
 			if(_checked)  
 			{  
-				_tick.graphics.lineStyle(2);  
-				_tick.graphics.moveTo(2,5);  
-				_tick.graphics.lineTo(4,8);  
-				_tick.graphics.lineTo(8,2);  
+				_circle.graphics.beginFill(0x00ff00,0.5);  
+				_circle.graphics.drawCircle(5,5,4);  
+				_circle.graphics.endFill();  
 			}  
-		}
+		} 
 		
 		public function test():void {
 			graphics.clear();
@@ -202,5 +199,16 @@ package com.ph4nf4n.utils
 			graphics.drawRoundRect(0, 0,this._width,this._height,0,0);
 			graphics.endFill();
 		}
+		
+		/*
+		Units.test
+		
+		var c:UICheckBox = new UICheckBox(20,20,80,20);
+		c.text="激活用户";
+		c.test();
+		addChild(c);
+		
+		
+		*/
 	}
 }

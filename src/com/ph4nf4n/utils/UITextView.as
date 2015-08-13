@@ -17,7 +17,7 @@ package com.ph4nf4n.utils
 			height = $height;  
 			
 			var _tft:TextFormat = new TextFormat();
-			_tft.size = 14;
+			_tft.size = 12;
 			_tft.font = "Microsoft Yahei,STXihei,SimSun,Arial,Verdana";
 			defaultTextFormat = _tft;
 			
