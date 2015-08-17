@@ -45,7 +45,7 @@ package com.ph4nf4n.utils
 			
 			options = extend(option, setting);
 			
-			console(options);
+			//console(options);
 			addChildren();
 			draw();
 			innerEventListener();
@@ -192,6 +192,11 @@ package com.ph4nf4n.utils
 						break;
 				}
 			}
+		}
+		
+		public function set text(str:String):void {
+			this.options.text = str;
+			btnTxt.text = str;
 		}
 	}
 }
