@@ -10,7 +10,7 @@ package com.ph4nf4n.utils
 }
 */
 
-package com.ph4nf4n.utils
+package com.ph4nf4n.components
 {
 	import flash.display.MovieClip;
 	import flash.display.Sprite;

@@ -1,4 +1,4 @@
-package com.ph4nf4n.utils
+package com.ph4nf4n.components
 {
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
@@ -23,7 +23,7 @@ package com.ph4nf4n.utils
 		private var setting:Object = {
 			x: 0,
 			y: 0,
-			width: 60,
+			width: 80,
 			height: 30,
 			text: "按钮",
 			bgColor: 0xf90f90,

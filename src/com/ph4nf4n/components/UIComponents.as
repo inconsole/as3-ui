@@ -1,4 +1,4 @@
-package com.ph4nf4n.utils
+package com.ph4nf4n.components
 {
 	import flash.display.Sprite;
 	
