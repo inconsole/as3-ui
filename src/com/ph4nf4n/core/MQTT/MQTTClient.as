@@ -13,6 +13,10 @@ package com.ph4nf4n.core.MQTT
 	
 	public class MQTTClient
 	{
+		private static const MAX_LEN_UUID:int=23;
+		private static const MAX_LEN_TOPIC:int=7;
+		private static const MAX_LEN_USERNAME:int=12;
+		
 		private var socket:Socket;
 		public var host:String;
 		public var port:Number;
@@ -22,6 +26,7 @@ package com.ph4nf4n.core.MQTT
 		public var password:String;
 		public var cleanSession:Boolean=true;
 		public var topicname:String="system";
+		public var keepalive:int=10;
 		public var debug:Boolean = false;
 		
 		private var servicing:Boolean;
@@ -44,8 +49,11 @@ package com.ph4nf4n.core.MQTT
 				this.clientid = clientid;
 			}
 			else {
-				this.clientid = MQTTUtil.createUID();
+				//this.clientid = MQTTUtil.createUID(MAX_LEN_UUID);
+				this.clientid = "hacker";
 			}
+			if (will)
+				this.will = MQTTProtocol.WILL;
 			if (cleanSession)
 				this.cleanSession = cleanSession;
 			
@@ -66,9 +74,10 @@ package com.ph4nf4n.core.MQTT
 		 *
 		*/
 		protected function onConnect(event:Event):void {
+			trace("connect");
 			if (this.connectMessage == null)
 			{
-				this.connectMessage=new MQTT_Protocol();
+				this.connectMessage=new MQTTProtocol();
 				var bytes:ByteArray=new ByteArray();
 				bytes.writeByte(0x00); //0
 				bytes.writeByte(0x06); //6
@@ -98,42 +107,76 @@ package com.ph4nf4n.core.MQTT
 				if (password)
 					type+=64;
 				bytes.writeByte(type); //Clean session only
+				this.connectMessage.debug(bytes,"p-c");
 				//Keep Alive timer
 				bytes.writeByte(keepalive >> 8); //Keepalive MSB
 				bytes.writeByte(keepalive & 0xff); //Keepaliave LSB = 60
 				writeString(bytes, clientid);
 				writeString(bytes, username ? username : "");
 				writeString(bytes, password ? password : "");
-				this.connectMessage.writeMessageType(MQTT_Protocol.CONNECT); //Connect
+				this.connectMessage.messageType(MQTTProtocol.CONNECT); //Connect
 				this.connectMessage.writeMessageValue(bytes); //Connect
 			}
+			trace("MQTT connectMesage.length:{0}", this.connectMessage.length);
+			this.socket.writeBytes(this.connectMessage, 0, this.connectMessage.length);
+			this.socket.flush();
+			//dispatch event
+			//just TCP/IP connection not MQTT connection
+			//this.dispatchEvent(new MQTTEvent(MQTTEvent.CONNECT, false, false));
+			this._isConnect = true;
 		}
 		
 		protected function onClose(event:Event):void {
-			print_debug("onClose: ");
+			trace("onClose: ");
 		}
 		
 		protected function onError(event:IOErrorEvent):void
 		{
-			print_debug("onError: ");
+			trace("onError: ");
 		}
 		
 		protected function onSecError(event:SecurityErrorEvent):void
 		{
-			print_debug("onSecError: ");
+			trace("onSecError: ");
 			//dispatch event
 			//this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false));
 		}
 		
 		protected function onSocketData(event:ProgressEvent):void {
-			//
+			var type:uint = socket.readUnsignedByte();
+			trace(socket.readUnsignedByte());
+			
+			switch (type)
+			{
+				case MQTTProtocol.CONNACK:
+					trace("Acknowledge connection request");
+					break;
+				default:
+					break;
+			}
+
+
 		}
 		
+		protected function writeString(bytes:ByteArray, str:String):void
+		{
+			var len:int=str.length;
+			var msb:int=len >> 8;
+			var lsb:int=len % 256;
+			bytes.writeByte(msb);
+			bytes.writeByte(lsb);
+			bytes.writeMultiByte(str, 'utf-8');
+		}
 		
-		protected function print_debug(str:String):void {
-			if(this.debug) {
-				trace(str);
+		protected function print_debug(bytes:ByteArray):void {
+			var s:String = "";
+			bytes.position = 0;
+			while (bytes.bytesAvailable)
+			{
+				s += "0x" + bytes.readByte().toString(16) + " ";
 			}
+			if (s.length > 0) s = s.substr(0, s.length - 1);
+			trace("bytes:", s);
 		}
 		
 		public function test():void

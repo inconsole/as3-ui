@@ -31,8 +31,73 @@ package com.ph4nf4n.core.MQTT
 		public static const CONNACK_REFUSED_BAD_USERNAME_PASSWORD:int=4;
 		public static const CONNACK_REFUSED_NOT_AUTHORIZED:int=5;
 		
-		public function MQTTProtocol()
+		
+		protected var fixHead:ByteArray;	//固定
+		protected var varHead:ByteArray;	//可变
+		protected var payLoad:ByteArray;	//
+		
+		protected var type:uint;
+		protected var remainingLength:uint;
+		
+		public static var WILL:Array;
+		/* static block */
 		{
+			WILL = [];
+			//fake manual writing (big-endian)
+			WILL['qos'] = 0x01;
+			WILL['retain'] = 0x01;
+		}
+		
+		public function MQTTProtocol():void
+		{
+			super();
+		}
+		
+		public function messageType(value:int):void {
+			type = value & 0xF0;
+		}
+		
+		public function writeMessageType(value:int):void {
+			//
+		}
+		
+		public function writeMessageValue(value:*):void {
+			if( payLoad == null )
+				payLoad = new ByteArray();
+			payLoad.writeBytes(value);
+			this.serialize();
+		}
+		
+		public function serialize():void {
+			switch( type ){
+				case CONNECT:
+					remainingLength = payLoad.length;
+					
+					if( fixHead == null )
+						fixHead = new ByteArray();
+					fixHead.clear();
+					fixHead.writeByte(CONNECT);
+					fixHead.writeByte(remainingLength);
+
+					this.position=0;
+					this.writeBytes(fixHead);
+					
+					this.position = 2;
+					this.writeBytes(payLoad);
+				default:
+					break;
+			}
+		}
+		
+		public function debug(bytes:ByteArray,type:String="info"):void {
+			var s:String = "";
+			bytes.position = 0;
+			while (bytes.bytesAvailable)
+			{
+				s += "0x" + bytes.readByte().toString(16) + " ";
+			}
+			if (s.length > 0) s = s.substr(0, s.length - 1);
+			trace("[",type,"]","bytes:", s);
 		}
 	}
 }
