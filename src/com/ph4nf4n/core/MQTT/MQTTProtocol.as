@@ -124,14 +124,28 @@ package com.ph4nf4n.core.MQTT
 			this.position=0;
 			//fix
 			this.writeByte(msgType);
-			this.writeByte(remaining_length);
+			//this.writeByte(remaining_length);
+			var lenArray:ByteArray = setmsglength(remaining_length);
+			this.writeBytes(lenArray);
 			
 			//payload
 			this.writeBytes(buffer);
 		}
 		
-		//计算publish消息长度
-		public function setmsglength(len:int) {
+		//计算publish消息长度,最多允许4个字节，256m
+		public function setmsglength(len:int):ByteArray {
+			var bytes:ByteArray = new ByteArray();
+			
+			do {
+				var digit:uint = len % 128;
+				len = len >> 7;
+				if(len > 0) {
+					digit = (digit | 0x80);
+				}
+				bytes.writeByte(digit);
+			}while (len >0 );
+			
+			return bytes;
 			//
 			/*
 			$string = "";

@@ -200,6 +200,8 @@ package com.ph4nf4n.core.MQTT
 		
 		protected function onClose(event:Event):void {
 			trace("onClose: ");
+			keep_alive_timer.stop();
+			this._isConnect = false;
 		}
 		
 		protected function onError(event:IOErrorEvent):void
@@ -227,6 +229,9 @@ package com.ph4nf4n.core.MQTT
 				{
 					case MQTTProtocol.CONNACK:	//0x20 连接成功
 						onConnack(data);
+						break;
+					case MQTTProtocol.PUBLISH:	//0x30	订阅消息接收
+						onPublish(data);
 						break;
 					case MQTTProtocol.PINGRESP:	//0xd0	ping成功返回
 						onPingresp(data);
@@ -269,7 +274,7 @@ package com.ph4nf4n.core.MQTT
 		protected function onSuback(data:ByteArray):void
 		{
 			//TODO
-			publish("demo","123456中文看看9月7日上午 123456中文看看9月7日上午 123456中文看看9月7日上午12345678901234567890",1);
+			publish("demo","123456中文看看9月7日上午 123456中文看看9月7日上午 123456",1);
 		}
 		
 		//pushlish成功返回
@@ -281,6 +286,89 @@ package com.ph4nf4n.core.MQTT
 		protected function onPubrec(data:ByteArray):void
 		{
 			//TODO
+		}
+		
+		//订阅消息接收
+		protected function onPublish(data:ByteArray):void{
+			/*
+			两种状态
+			1:消息小于127
+			2:消息大于127
+			
+			ep: topicname:demo msg:123456
+			0x0 0x4 0x64 0x65 0x6d 0x6f 0x31 0x32 0x33 0x34 0x35 0x36
+			
+			ep: topicname:demo msg:123456 ....... ( msg > 127)
+			0x5 0x0 0x4 0x64 0x65 0x6d 0x6f 0x31 0x32 0x33 0x34 0x35 0x36
+			
+			订阅返回的消息，根据回来的数据包得出
+			1:第一个字节不是(0x00)或者 第二个字节等于(0x00) 为 消息大于127的类型
+			2: 0x0 0x4 为topicname 的长度   
+			3: topicname完了之后，后面的全部为 msg 的内容
+			
+			(0x64 0x65 0x6d 0x6f) = demo
+			(0x31 0x32 0x33 0x34 0x35 0x36) = 123456
+			*/
+			var data_length:uint = data.length;
+			var tmp:ByteArray= new ByteArray();
+			var topicName:String;
+			var topicContent:String;
+			var offst:int;
+			
+			trace(data.length);
+			print_debug(data);
+			
+			data.position=1;
+			data.readBytes(tmp,0,1);
+			
+			print_debug(tmp);
+			tmp.position=0;
+			var len:uint = tmp.readUnsignedByte();
+			
+			if(len == 0x00) { //内容长度大于>127, var-header多各字节
+				data.position=2;
+				tmp.position=0;
+				
+				data.readBytes(tmp,0,1);
+				len = tmp.readUnsignedByte();
+				
+				//topicName
+				data.position=3;
+				topicName=data.readMultiByte(len, "utf");
+				
+				//topicContent
+				data.position = 3 +len;
+				topicContent=data.readMultiByte(data_length-3-len, "utf");
+			}
+			else { //<127
+				//topicName
+				data.position=2;
+				topicName=data.readMultiByte(len, "utf");
+				
+				//topicContent
+				data.position = 2 +len;
+				topicContent=data.readMultiByte(data_length-2-len, "utf");
+			}
+			
+			trace("Publish TopicName {0}", topicName);
+			trace("Publish TopicContent {0}", topicContent);
+			
+			//
+			//$tlen = (ord($msg{0})<<8) + ord($msg{1});
+			//$topic = substr($msg,2,$tlen);
+			//$msg = substr($msg,($tlen+2));
+			
+			//var length:uint = (data.readUnsignedByte() << 8) + data.readUnsignedByte();
+			//var topicName:String = data.readMultiByte(length, "utf");
+			
+			/*
+			data.position =2;
+			var payLoad:ByteArray = new ByteArray();
+			data.readBytes(payLoad);
+			
+			length = (payLoad.readUnsignedByte() << 8) + payLoad.readUnsignedByte();
+			var topicContent:String = payLoad.readMultiByte(length, "utf");
+			*/
 		}
 
 		//向服务器发送ping心跳包
