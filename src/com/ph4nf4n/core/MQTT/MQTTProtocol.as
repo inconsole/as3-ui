@@ -84,10 +84,70 @@ package com.ph4nf4n.core.MQTT
 					
 					this.position = 2;
 					this.writeBytes(payLoad);
+					break;
+				case SUBSCRIBE:
+					remainingLength = payLoad.length;
+					
+					if( fixHead == null )
+						fixHead = new ByteArray();
+					fixHead.writeByte(130);
+					fixHead.writeByte(remainingLength);
+					
+					this.position=0;
+					this.writeBytes(fixHead);
+					
+					this.position = 2;
+					this.writeBytes(payLoad);
+					break;
 				default:
 					break;
 			}
 		}
+		
+		//构造订阅数据包
+		public function subscribeData(msgType:int,buffer:ByteArray):void {
+			var remaining_length:int  = buffer.length; //剩余长度
+			
+			this.position=0;
+			//fix
+			this.writeByte(msgType);
+			this.writeByte(remaining_length);
+			
+			//payload
+			this.writeBytes(buffer);
+		}
+		
+		//构造发布数据包
+		public function publishData(msgType:int,buffer:ByteArray):void {
+			var remaining_length:int  = buffer.length;
+			
+			this.position=0;
+			//fix
+			this.writeByte(msgType);
+			this.writeByte(remaining_length);
+			
+			//payload
+			this.writeBytes(buffer);
+		}
+		
+		//计算publish消息长度
+		public function setmsglength(len:int) {
+			//
+			/*
+			$string = "";
+			do{
+			$digit = $len % 128;
+			$len = $len >> 7;
+			// if there are more digits to encode, set the top bit of this digit
+			if ( $len > 0 )
+			$digit = ($digit | 0x80);
+			$string .= chr($digit);
+			}while ( $len > 0 );
+			return $string;
+			*/
+			
+		}
+		
 		
 		public function debug(bytes:ByteArray,type:String="info"):void {
 			var s:String = "";

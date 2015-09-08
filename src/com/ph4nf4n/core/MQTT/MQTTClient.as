@@ -1,23 +1,34 @@
 package com.ph4nf4n.core.MQTT
 {
+	import com.ph4nf4n.core.MQTT.MQTTEvent;
 	import com.ph4nf4n.core.MQTT.MQTTProtocol;
 	import com.ph4nf4n.core.MQTT.MQTTUtil;
 	
 	import flash.events.Event;
+	import flash.events.EventDispatcher;
 	import flash.events.IOErrorEvent;
 	import flash.events.ProgressEvent;
 	import flash.events.SecurityErrorEvent;
+	import flash.events.TimerEvent;
 	import flash.net.Socket;
 	import flash.system.Security;
 	import flash.utils.ByteArray;
+	import flash.utils.Timer;
 	
-	public class MQTTClient
+	[Event(name="mqttConnect", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	[Event(name="mqttClose", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	[Event(name="mqttMessage", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	[Event(name="mqttError", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	[Event(name="mqttPublish", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	
+	public class MQTTClient extends EventDispatcher
 	{
 		private static const MAX_LEN_UUID:int=23;
 		private static const MAX_LEN_TOPIC:int=7;
 		private static const MAX_LEN_USERNAME:int=12;
 		
 		private var socket:Socket;
+		private var msgid:int=1;
 		public var host:String;
 		public var port:Number;
 		public var clientid:String; 
@@ -29,10 +40,15 @@ package com.ph4nf4n.core.MQTT
 		public var keepalive:int=10;
 		public var debug:Boolean = false;
 		
+		private var keep_alive_timer:Timer;
 		private var servicing:Boolean;
 		private var _isConnect:Boolean;
 		
 		private var connectMessage:MQTTProtocol;
+		private var pingMessage:ByteArray;
+		private var disconnectMessage:ByteArray;
+		private var subscribeMessage:MQTTProtocol;
+		private var publishMessage:MQTTProtocol;
 		
 		public function MQTTClient(host:String=null, port:int=1883,username:String=null, password:String=null, topicname:String=null, clientid:String=null, will:Boolean=true,cleanSession:Boolean=true){
 			if (host)
@@ -49,8 +65,7 @@ package com.ph4nf4n.core.MQTT
 				this.clientid = clientid;
 			}
 			else {
-				//this.clientid = MQTTUtil.createUID(MAX_LEN_UUID);
-				this.clientid = "hacker";
+				this.clientid = MQTTUtil.createUID(MAX_LEN_UUID);
 			}
 			if (will)
 				this.will = MQTTProtocol.WILL;
@@ -65,8 +80,65 @@ package com.ph4nf4n.core.MQTT
 			socket.addEventListener(ProgressEvent.SOCKET_DATA, onSocketData); //dispatched when socket can be read
 			socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSecError); //dispatched when security gets in the way
 
-			//keep_alive_timer=new Timer(keepalive / 2 * 1000);
-			//keep_alive_timer.addEventListener(TimerEvent.TIMER, onPing);
+			keep_alive_timer=new Timer(keepalive / 2 * 1000);
+			keep_alive_timer.addEventListener(TimerEvent.TIMER, onPing);
+		}
+		
+		//订阅
+		public function subscribe(topicnames:Vector.<String>, Qoss:Vector.<int>, QoS:int=0):void
+		{
+			var bytes:ByteArray = new ByteArray();
+			
+			if( QoS ) msgid++;
+			bytes.writeByte(msgid >> 8);
+			bytes.writeByte(msgid % 256);
+			
+			var i:int;			
+			for(i = 0; i < topicnames.length; i++){
+				writeString(bytes, topicnames[i]);
+				bytes.writeByte(Qoss[i]);
+			}
+			//TODO:send subscribe message
+			var type:int=MQTTProtocol.SUBSCRIBE;
+			type += (QoS << 1);
+			
+			this.subscribeMessage=new MQTTProtocol();
+			this.subscribeMessage.subscribeData(type,bytes);
+			socket.writeBytes(this.subscribeMessage);
+			socket.flush();
+			
+			trace("Subscribe sent");
+		}
+		
+		//发布
+		public function publish(topicname:String, message:String, QoS:int=0, retain:int=0):void {
+			var bytes:ByteArray=new ByteArray();
+			writeString(bytes, topicname);
+			if (QoS)
+			{
+				msgid++;
+				bytes.writeByte(msgid >> 8);
+				bytes.writeByte(msgid % 256);
+			}
+			writeString(bytes, message);
+			//
+			var type:int=MQTTProtocol.PUBLISH;
+			//	type += (QoS << 1);
+			if(QoS) type += (QoS << 1); //@ph4nf4n.fix
+			if (retain)
+				type += 1;
+			this.publishMessage=new MQTTProtocol();
+			this.publishMessage.publishData(type,bytes);
+			
+			this.publishMessage.debug(bytes);
+			this.publishMessage.debug(this.publishMessage);
+			
+			trace("MQTT publishMessage.length:{0}", this.publishMessage.length);
+			this.socket.writeBytes(this.publishMessage, 0, this.publishMessage.length);
+			this.socket.flush();
+			
+			//
+			trace("Publish sent");
 		}
 		
 		/*
@@ -145,17 +217,109 @@ package com.ph4nf4n.core.MQTT
 		protected function onSocketData(event:ProgressEvent):void {
 			var type:uint = socket.readUnsignedByte();
 			trace(socket.readUnsignedByte());
+			trace("0x",type.toString(16));
 			
-			switch (type)
+			while( socket.bytesAvailable ){
+				var data:ByteArray = new ByteArray();
+				socket.readBytes(data);
+				
+				switch (type)
+				{
+					case MQTTProtocol.CONNACK:	//0x20 连接成功
+						onConnack(data);
+						break;
+					case MQTTProtocol.PINGRESP:	//0xd0	ping成功返回
+						onPingresp(data);
+						break;
+					case MQTTProtocol.SUBACK:	//0x90	订阅返回
+						onSuback(data);
+						break;
+					case MQTTProtocol.PUBACK:	//0x40	qos=1 publish响应
+						onPuback(data);
+						break;
+					case MQTTProtocol.PUBREC:	//		qos=2 publish响应
+						onPubrec(data);
+						break;
+					default:
+						break;
+				}
+			}
+
+
+		}
+		
+		protected function onConnack(data:ByteArray):void
+		{
+			data.position=1;
+			switch (data.readUnsignedByte())
 			{
-				case MQTTProtocol.CONNACK:
-					trace("Acknowledge connection request");
+				case 0x00:	//连接成功
+					trace("socket connect");
+					servicing = true;
+					keep_alive_timer.start();
+					//dispatch event
+					subscribe(Vector.<String>(["system","demo","zhangsan123"]), Vector.<int>([1,2,2]), 1);
 					break;
 				default:
 					break;
 			}
+		}
+		
+		//订阅成功返回
+		protected function onSuback(data:ByteArray):void
+		{
+			//TODO
+			publish("demo","123456中文看看9月7日上午 123456中文看看9月7日上午 123456中文看看9月7日上午12345678901234567890",1);
+		}
+		
+		//pushlish成功返回
+		protected function onPuback(data:ByteArray):void
+		{
+			//TODO
+		}
+		
+		protected function onPubrec(data:ByteArray):void
+		{
+			//TODO
+		}
 
-
+		//向服务器发送ping心跳包
+		protected function onPing(event:TimerEvent):void
+		{
+			if (this.pingMessage == null)
+			{
+				this.pingMessage=new ByteArray();
+				
+				this.pingMessage.writeByte(MQTTProtocol.PINGREQ);
+				this.pingMessage.writeByte(0);
+				this.pingMessage.writeBytes(new ByteArray);
+			}
+			//trace("MQTT pingMessage.length:{0}", this.pingMessage.length);
+			socket.writeBytes(this.pingMessage, 0, this.pingMessage.length);
+			socket.flush();
+		}
+		
+		//服务器ping返回
+		protected function onPingresp(data:ByteArray):void
+		{
+			//TODO
+		}
+		
+		//关闭服务器连接
+		public function close():void
+		{
+			if (this.disconnectMessage == null)
+			{
+				this.disconnectMessage=new ByteArray();
+				this.disconnectMessage.writeByte(MQTTProtocol.DISCONNECT);
+				this.disconnectMessage.writeByte(0);
+				this.disconnectMessage.writeBytes(new ByteArray);
+			}
+			socket.writeBytes(this.disconnectMessage);
+			socket.flush();
+			socket.close();
+			//dispatch event
+			//this.dispatchEvent(new MQTTEvent(MQTTEvent.CLOSE, false, false));
 		}
 		
 		protected function writeString(bytes:ByteArray, str:String):void
@@ -174,8 +338,10 @@ package com.ph4nf4n.core.MQTT
 			while (bytes.bytesAvailable)
 			{
 				s += "0x" + bytes.readByte().toString(16) + " ";
+				//trace("" + bytes.readByte().toString(2) + "  " + "0x" + bytes.readByte().toString(16) + "");
 			}
 			if (s.length > 0) s = s.substr(0, s.length - 1);
+			trace("---------------------------->");
 			trace("bytes:", s);
 		}
 		
