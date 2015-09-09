@@ -15,11 +15,11 @@ package com.ph4nf4n.core.MQTT
 	import flash.utils.ByteArray;
 	import flash.utils.Timer;
 	
-	[Event(name="mqttConnect", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
-	[Event(name="mqttClose", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
-	[Event(name="mqttMessage", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
-	[Event(name="mqttError", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
-	[Event(name="mqttPublish", type="com.godpaper.mqtt.as3.core.MQTTEvent")]
+	[Event(name="mqttConnect", type="com.ph4nf4n.core.MQTT.MQTTEvent")]
+	[Event(name="mqttClose", type="com.ph4nf4n.core.MQTT.MQTTEvent")]
+	[Event(name="mqttMessage", type="com.ph4nf4n.core.MQTT.MQTTEvent")]
+	[Event(name="mqttError", type="com.ph4nf4n.core.MQTT.MQTTEvent")]
+	[Event(name="mqttPublish", type="com.ph4nf4n.core.MQTT.MQTTEvent")]
 	
 	public class MQTTClient extends EventDispatcher
 	{
@@ -40,9 +40,24 @@ package com.ph4nf4n.core.MQTT
 		public var keepalive:int=10;
 		public var debug:Boolean = false;
 		
+		//参数集合
+		private var options:Object = {};
+		// 默认参数
+		private var def_setting:Object = {
+			host: null,
+			port: 1883,
+			username: null,
+			password: null,
+			topicname: null,
+			clientid: null,
+			will: true,
+			cleanSession: true
+		};
+		
 		private var keep_alive_timer:Timer;
 		private var servicing:Boolean;
 		private var _isConnect:Boolean;
+		public  var messageObj:Object=null;
 		
 		private var connectMessage:MQTTProtocol;
 		private var pingMessage:ByteArray;
@@ -51,6 +66,7 @@ package com.ph4nf4n.core.MQTT
 		private var publishMessage:MQTTProtocol;
 		
 		public function MQTTClient(host:String=null, port:int=1883,username:String=null, password:String=null, topicname:String=null, clientid:String=null, will:Boolean=true,cleanSession:Boolean=true){
+		//public function MQTTClient(option:Object){
 			if (host)
 				this.host=host;
 			if (port)
@@ -71,7 +87,10 @@ package com.ph4nf4n.core.MQTT
 				this.will = MQTTProtocol.WILL;
 			if (cleanSession)
 				this.cleanSession = cleanSession;
+
+			//options = extend(option, def_setting);
 			
+
 			Security.allowDomain("*");
 			socket=new Socket(host, port);
 			socket.addEventListener(Event.CONNECT, onConnect); //dispatched when the connection is established
@@ -82,6 +101,28 @@ package com.ph4nf4n.core.MQTT
 
 			keep_alive_timer=new Timer(keepalive / 2 * 1000);
 			keep_alive_timer.addEventListener(TimerEvent.TIMER, onPing);
+		}
+		
+		/*
+		* @method 合并默认参数和传递参数
+		*/
+		private function extend(des:Object, sor:Object):Object {
+			for (var item:String in sor) {
+				if (!des[item]) {
+					des[item] = sor[item];
+				}
+			}
+			return des;
+		}
+		
+		//连接
+		public function connect(host:String=null, port:int=1883):void
+		{
+			if (host)
+				this.host=host;
+			if (port)
+				this.port=port;
+			socket.connect(this.host, this.port);
 		}
 		
 		//订阅
@@ -106,8 +147,6 @@ package com.ph4nf4n.core.MQTT
 			this.subscribeMessage.subscribeData(type,bytes);
 			socket.writeBytes(this.subscribeMessage);
 			socket.flush();
-			
-			trace("Subscribe sent");
 		}
 		
 		//发布
@@ -130,23 +169,17 @@ package com.ph4nf4n.core.MQTT
 			this.publishMessage=new MQTTProtocol();
 			this.publishMessage.publishData(type,bytes);
 			
-			this.publishMessage.debug(bytes);
-			this.publishMessage.debug(this.publishMessage);
-			
-			trace("MQTT publishMessage.length:{0}", this.publishMessage.length);
+			//trace("MQTT publishMessage.length:{0}", this.publishMessage.length);
 			this.socket.writeBytes(this.publishMessage, 0, this.publishMessage.length);
 			this.socket.flush();
-			
-			//
-			trace("Publish sent");
 		}
 		
 		/*
 		 *Event
 		 *
 		*/
+		//TCP连接成功
 		protected function onConnect(event:Event):void {
-			trace("connect");
 			if (this.connectMessage == null)
 			{
 				this.connectMessage=new MQTTProtocol();
@@ -179,7 +212,7 @@ package com.ph4nf4n.core.MQTT
 				if (password)
 					type+=64;
 				bytes.writeByte(type); //Clean session only
-				this.connectMessage.debug(bytes,"p-c");
+
 				//Keep Alive timer
 				bytes.writeByte(keepalive >> 8); //Keepalive MSB
 				bytes.writeByte(keepalive & 0xff); //Keepaliave LSB = 60
@@ -189,7 +222,7 @@ package com.ph4nf4n.core.MQTT
 				this.connectMessage.messageType(MQTTProtocol.CONNECT); //Connect
 				this.connectMessage.writeMessageValue(bytes); //Connect
 			}
-			trace("MQTT connectMesage.length:{0}", this.connectMessage.length);
+			//trace("MQTT connectMesage.length:{0}", this.connectMessage.length);
 			this.socket.writeBytes(this.connectMessage, 0, this.connectMessage.length);
 			this.socket.flush();
 			//dispatch event
@@ -199,27 +232,26 @@ package com.ph4nf4n.core.MQTT
 		}
 		
 		protected function onClose(event:Event):void {
-			trace("onClose: ");
 			keep_alive_timer.stop();
 			this._isConnect = false;
+			
+			this.dispatchEvent(new MQTTEvent(MQTTEvent.CLOSE, false, false));
 		}
 		
 		protected function onError(event:IOErrorEvent):void
 		{
-			trace("onError: ");
+			this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false));
 		}
 		
 		protected function onSecError(event:SecurityErrorEvent):void
 		{
-			trace("onSecError: ");
-			//dispatch event
-			//this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false));
+			this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false));
 		}
 		
 		protected function onSocketData(event:ProgressEvent):void {
 			var type:uint = socket.readUnsignedByte();
-			trace(socket.readUnsignedByte());
-			trace("0x",type.toString(16));
+			//trace(socket.readUnsignedByte());
+			//trace("0x",type.toString(16));
 			
 			while( socket.bytesAvailable ){
 				var data:ByteArray = new ByteArray();
@@ -258,14 +290,34 @@ package com.ph4nf4n.core.MQTT
 			data.position=1;
 			switch (data.readUnsignedByte())
 			{
-				case 0x00:	//连接成功
-					trace("socket connect");
+				case 0x00:	//MQTT连接成功
 					servicing = true;
 					keep_alive_timer.start();
 					//dispatch event
-					subscribe(Vector.<String>(["system","demo","zhangsan123"]), Vector.<int>([1,2,2]), 1);
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.CONNECT, false, false,"Socket connected"));
+					break;
+				case 0x01:
+					//dispatch event
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection Refused: unacceptable protocol version"));
+					break;
+				case 0x02:
+					//dispatch event
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection Refused: identifier rejected"));
+					break;
+				case 0x03:
+					//dispatch event
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection Refused: server unavailable"));
+					break;
+				case 0x04:
+					//dispatch event
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection Refused: bad user name or password"));
+					break;
+				case 0x05:
+					//dispatch event
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection Refused: not authorized"));
 					break;
 				default:
+					this.dispatchEvent(new MQTTEvent(MQTTEvent.ERROR, false, false, "Connection error: return unknown code"));
 					break;
 			}
 		}
@@ -274,7 +326,6 @@ package com.ph4nf4n.core.MQTT
 		protected function onSuback(data:ByteArray):void
 		{
 			//TODO
-			publish("demo","123456中文看看9月7日上午 123456中文看看9月7日上午 123456",1);
 		}
 		
 		//pushlish成功返回
@@ -302,7 +353,7 @@ package com.ph4nf4n.core.MQTT
 			0x5 0x0 0x4 0x64 0x65 0x6d 0x6f 0x31 0x32 0x33 0x34 0x35 0x36
 			
 			订阅返回的消息，根据回来的数据包得出
-			1:第一个字节不是(0x00)或者 第二个字节等于(0x00) 为 消息大于127的类型
+			1:第一个字节不是(0x0)或者 第二个字节等于(0x0) 为 消息大于127的类型
 			2: 0x0 0x4 为topicname 的长度   
 			3: topicname完了之后，后面的全部为 msg 的内容
 			
@@ -315,8 +366,8 @@ package com.ph4nf4n.core.MQTT
 			var topicContent:String;
 			var offst:int;
 			
-			trace(data.length);
-			print_debug(data);
+			//trace(data.length);
+			//print_debug(data);
 			
 			data.position=1;
 			data.readBytes(tmp,0,1);
@@ -338,7 +389,7 @@ package com.ph4nf4n.core.MQTT
 				
 				//topicContent
 				data.position = 3 +len;
-				topicContent=data.readMultiByte(data_length-3-len, "utf");
+				topicContent=data.readMultiByte(data_length-3-len, "gb2312");
 			}
 			else { //<127
 				//topicName
@@ -347,28 +398,18 @@ package com.ph4nf4n.core.MQTT
 				
 				//topicContent
 				data.position = 2 +len;
-				topicContent=data.readMultiByte(data_length-2-len, "utf");
+				topicContent=data.readMultiByte(data_length-2-len, "gb2312");
 			}
 			
-			trace("Publish TopicName {0}", topicName);
-			trace("Publish TopicContent {0}", topicContent);
+			//trace("Publish TopicName {0}", topicName);
+			//trace("Publish TopicContent {0}", topicContent);
+			if(messageObj == null) {
+				messageObj = new Object();
+			}
+			messageObj['topic'] = topicName;
+			messageObj['payload'] = topicContent;
 			
-			//
-			//$tlen = (ord($msg{0})<<8) + ord($msg{1});
-			//$topic = substr($msg,2,$tlen);
-			//$msg = substr($msg,($tlen+2));
-			
-			//var length:uint = (data.readUnsignedByte() << 8) + data.readUnsignedByte();
-			//var topicName:String = data.readMultiByte(length, "utf");
-			
-			/*
-			data.position =2;
-			var payLoad:ByteArray = new ByteArray();
-			data.readBytes(payLoad);
-			
-			length = (payLoad.readUnsignedByte() << 8) + payLoad.readUnsignedByte();
-			var topicContent:String = payLoad.readMultiByte(length, "utf");
-			*/
+			this.dispatchEvent(new MQTTEvent(MQTTEvent.MESSAGE, false, false,topicName,messageObj));
 		}
 
 		//向服务器发送ping心跳包
@@ -406,8 +447,9 @@ package com.ph4nf4n.core.MQTT
 			socket.writeBytes(this.disconnectMessage);
 			socket.flush();
 			socket.close();
+			
 			//dispatch event
-			//this.dispatchEvent(new MQTTEvent(MQTTEvent.CLOSE, false, false));
+			this.dispatchEvent(new MQTTEvent(MQTTEvent.CLOSE, false, false));
 		}
 		
 		protected function writeString(bytes:ByteArray, str:String):void
@@ -432,10 +474,6 @@ package com.ph4nf4n.core.MQTT
 			trace("---------------------------->");
 			trace("bytes:", s);
 		}
-		
-		public function test():void
-		{
-			trace("demo");
-		}
+
 	}
 }
