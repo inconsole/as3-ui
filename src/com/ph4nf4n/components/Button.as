@@ -1,18 +1,21 @@
 package com.ph4nf4n.components 
 {
-	import com.ph4nf4n.events.ButtonEvent;
+	import com.ph4nf4n.components.ButtonEvent;
 	
+	import flash.display.Loader;
 	import flash.display.Sprite;
+	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.filters.GlowFilter;
 	import flash.geom.Rectangle;
+	import flash.net.URLRequest;
 	import flash.text.TextField;
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
 	import flash.ui.Mouse;
 	import flash.ui.MouseCursor;
-	
+
 	//TODO:
 	/*
 	1:鼠标放上去手势
@@ -24,6 +27,7 @@ package com.ph4nf4n.components
 		
 		public  var textLabel:TextField;
 		private var _text:String;
+		private var _image:String;
 		private var _width:Number;
 		private var _height:Number;
 		private var _noraml_background_color:uint=0xf90f90;
@@ -37,12 +41,31 @@ package com.ph4nf4n.components
 			this._width = $w;
 			this._height = $h;
 		
-			draw();
+			//draw();
 			button.addEventListener(MouseEvent.MOUSE_OVER, onMouseOverHandler, false, 0, true);
 			button.addEventListener(MouseEvent.MOUSE_OUT, onMouseOutHandler, false, 0, true);
-			button.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDownHandler, false, 0, true);
+			//button.addEventListener(MouseEvent.MOUSE_DOWN, onMouseDownHandler, false, 0, true);
 			button.addEventListener(MouseEvent.MOUSE_UP, onMouseUpHandler, false, 0, true);
 			addChild(button);
+			button.buttonMode = true;
+		}
+		
+		public function set text(str:String):void {
+			_text = str;
+			draw();
+		}
+		
+		//加载图片
+		public function set image(url:String):void {
+			var loader:Loader = new Loader();
+			var urlR:URLRequest = new URLRequest(url);
+			loader.load(urlR);
+			loader.contentLoaderInfo.addEventListener(Event.COMPLETE,function():void{
+				loader.content.width = _width;
+				loader.content.height = _height;
+				button.addChild(loader);
+			});
+
 		}
 		
 		private function draw():void {
@@ -52,7 +75,7 @@ package com.ph4nf4n.components
 			button.graphics.endFill();
 
 			textLabel= new TextField();
-			textLabel.text = "Button";
+			textLabel.text = _text;
 			textLabel.x = 0;
 			textLabel.y = 11;
 			textLabel.width = this._width;
@@ -87,7 +110,7 @@ package com.ph4nf4n.components
 		 * */
 		public function onMouseOverHandler(event:MouseEvent):void
 		{
-			trace("onMouseOverHandler2");			
+			trace("鼠标按钮进入");			
 			this.backGroundColor=0x296898;
 			
 			//Mouse.cursor = "button";
@@ -98,7 +121,7 @@ package com.ph4nf4n.components
 		 * */
 		public function onMouseOutHandler(event:MouseEvent):void
 		{
-			trace("onMouseOutHandler");
+			trace("鼠标从按钮离开");
 			this.backGroundColor=this._noraml_background_color;
 		}
 		
@@ -107,7 +130,7 @@ package com.ph4nf4n.components
 		 * */
 		public function onMouseDownHandler(event:MouseEvent):void
 		{
-			trace("onMouseDownHandler");
+			trace("鼠标从按钮按下");
 			dispatchEvent(new ButtonEvent(ButtonEvent.ON_BUTTON_CLICK));
 		}
 		
@@ -116,21 +139,52 @@ package com.ph4nf4n.components
 		 * */
 		public function onMouseUpHandler(event:MouseEvent):void
 		{
-			trace("onMouseUpHandler");
+			//trace("鼠标从按钮抬起事件");
+		}
+		
+		public function EventListener(eventObj:Object):void {
+			for (var item:String in eventObj) {
+				switch(item) {
+					case "Click":
+						//button.addEventListener(MouseEvent.CLICK, eventObj[item],false,10);
+						button.addEventListener(MouseEvent.MOUSE_DOWN, eventObj[item],false,10);
+						break;
+					case "MouseOver":
+						button.addEventListener(MouseEvent.MOUSE_OVER, eventObj[item],false,10);
+						break;
+					case "MouseOut":
+						button.addEventListener(MouseEvent.MOUSE_OUT, eventObj[item],false,10);
+						break;
+					case "MouseDown":
+						button.addEventListener(MouseEvent.MOUSE_DOWN, eventObj[item],false,10);
+						break;
+					case "MouseUp":
+						button.addEventListener(MouseEvent.MOUSE_UP, eventObj[item],false,10);
+						break;
+					default:
+						break;
+				}
+			}
 		}
 		
 		
 		/*
 		Units.test
 		
-		btn = new Button(50,100,120,45);
-		btn.textLabel.text= "button.text";
-		btn.addEventListener(ButtonEvent.ON_BUTTON_CLICK,onBtnClick);
+		var btn:Button = new Button(50,100,80,60);
+		//图片按钮
+		btn.image = "http://img.iknow.bdimg.com/avatar/100/r6s1g11.gif";
+		//文字按钮
+		btn.text= "button.text";
+
 		addChild(btn);
 		
-		public function onBtnClick(event:ButtonEvent):void {
-			btn.textLabel.text= "btn.click";
-		}
+		//点击事件
+		btn.EventListener({
+			Click:function(e:MouseEvent):void {
+				trace("传入自定义的点击事件");
+			}
+		});
 
 		*/
 		

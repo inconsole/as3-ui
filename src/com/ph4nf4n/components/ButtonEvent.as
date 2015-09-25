@@ -1,4 +1,4 @@
-package com.ph4nf4n.events
+package com.ph4nf4n.components
 {
 	import flash.events.Event;
 	
