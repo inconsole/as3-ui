@@ -2,9 +2,13 @@ package com.ph4nf4n.components
 {
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
+	import flash.events.Event;
 	import flash.text.TextField;
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
+	
+	import flash.display.Loader;
+	import flash.net.URLRequest;
 	
 	public class UIButton extends Sprite
 	{
@@ -26,6 +30,7 @@ package com.ph4nf4n.components
 			width: 80,
 			height: 30,
 			text: "按钮",
+			image:"",
 			bgColor: 0xf90f90,
 			overColor: 0x296898,
 			clickDownColor: 0xFDAA24,
@@ -85,7 +90,6 @@ package com.ph4nf4n.components
 			
 			btn.addChild(btnTxt);
 			btn.addChild(btnMask);
-			
 			addChild(btn);
 		}
 		
@@ -94,8 +98,25 @@ package com.ph4nf4n.components
 		*/
 		private function draw():void {
 			drawBg(options.bgColor);
+			drawImage(options.image);
 			drawBtnTxt();
 			drawBtnMask();
+		}
+		
+		/*
+		* @method 绘按钮添加图片
+		*/
+		private function drawImage(url:String):void {
+			if(!url) return;
+			
+			var loader:Loader = new Loader();
+			var urlR:URLRequest = new URLRequest(url);
+			loader.load(urlR);
+			loader.contentLoaderInfo.addEventListener(Event.COMPLETE,function():void{
+				loader.content.width = options.width;
+				loader.content.height = options.height;
+				addChild(loader);
+			});
 		}
 		
 		/*

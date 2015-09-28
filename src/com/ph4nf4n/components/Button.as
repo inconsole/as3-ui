@@ -77,7 +77,7 @@ package com.ph4nf4n.components
 			textLabel= new TextField();
 			textLabel.text = _text;
 			textLabel.x = 0;
-			textLabel.y = 11;
+			textLabel.y = 0;
 			textLabel.width = this._width;
 			textLabel.height = this._height;
 

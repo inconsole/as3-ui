@@ -1,3 +1,9 @@
+/*
+
+-----
+
+*/
+
 package com.ph4nf4n.components
 {
 	import flash.display.Bitmap;

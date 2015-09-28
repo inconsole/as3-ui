@@ -37,7 +37,7 @@ package com.ph4nf4n.components
 			
 			addChildren();
 			
-			//draw();
+			draw();
 			
 			/*
 			_textField = new TextField();
